@@ -1,8 +1,21 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AlgoRhythm
+
+AlgoRhythm is an interactive data-structures and algorithms learning workspace with visual execution, progress tracking, quizzes, and an AI tutor.
 
 ## Getting Started
 
-First, run the development server:
+## Local Setup
+
+Install dependencies and copy the environment template:
+
+```bash
+npm install
+copy .env.example .env.local
+```
+
+Create a Supabase project, then run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL editor. Add the project URL and anon key to `.env.local`. Add an OpenAI key to enable live tutor responses; without it, the local tutor fallback remains available.
+
+Start the development server:
 
 ```bash
 npm run dev
@@ -15,6 +28,16 @@ bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Backend Routes
+
+- `POST /api/auth/signup` creates a Supabase user and profile.
+- `POST /api/auth/signin` starts a Supabase session.
+- `POST /api/auth/signout` ends the session.
+- `GET /api/auth/me` returns the current user.
+- `POST /api/tutor` sends a protected tutor request to OpenAI or the local fallback.
+
+Never commit `.env.local`, Supabase service-role keys, or OpenAI keys.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
