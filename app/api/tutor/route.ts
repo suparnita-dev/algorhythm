@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
-import { createSupabaseServerClient } from "@/lib/server/supabase";
+import { sessionCookieName, userFromSession } from "@/lib/server/auth";
 
 const tutorSchema = z.object({
   message: z.string().trim().min(1).max(1000),
@@ -12,9 +12,9 @@ const tutorSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const supabase = await createSupabaseServerClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
+  const cookie = request.headers.get("cookie") ?? "";
+  const sessionToken = cookie.match(new RegExp(`${sessionCookieName()}=([^;]+)`))?.[1];
+  if (!userFromSession(sessionToken)) {
     return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   }
 

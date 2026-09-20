@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/server/supabase";
+import { cookies } from "next/headers";
+import { publicUser, sessionCookieName, userFromSession } from "@/lib/server/auth";
 
 export async function GET() {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return NextResponse.json({ user: null }, { status: 401 });
-  return NextResponse.json({ user: data.user });
+  const cookieStore = await cookies();
+  const user = userFromSession(cookieStore.get(sessionCookieName())?.value);
+  if (!user) return NextResponse.json({ user: null }, { status: 401 });
+  return NextResponse.json({ user: publicUser(user) });
 }
