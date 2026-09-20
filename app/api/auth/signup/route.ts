@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createSupabaseServerClient } from "@/lib/server/supabase";
+import { createUser, findUserByEmail, hashPassword, publicUser, setSessionCookie } from "@/lib/server/auth";
 
 const signupSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -11,18 +11,16 @@ const signupSchema = z.object({
 export async function POST(request: Request) {
   try {
     const input = signupSchema.parse(await request.json());
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.auth.signUp({
-      email: input.email.toLowerCase(),
-      password: input.password,
-      options: { data: { name: input.name } },
-    });
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    return NextResponse.json({ user: data.user, requiresEmailConfirmation: !data.session }, { status: 201 });
+    const email = input.email.toLowerCase();
+    if (findUserByEmail(email)) return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+    const user = createUser({ name: input.name, email, passwordHash: await hashPassword(input.password) });
+    const response = NextResponse.json({ user: publicUser(user) }, { status: 201 });
+    setSessionCookie(response, user.id);
+    return response;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Enter a valid name, email, and password of at least 8 characters." }, { status: 400 });
     }
-    return NextResponse.json({ error: "Unable to create the account. Configure Supabase first." }, { status: 500 });
+    return NextResponse.json({ error: "Unable to create the account." }, { status: 500 });
   }
 }
