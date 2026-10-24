@@ -427,7 +427,7 @@ export default function DSAStudio() {
     useState(true);
 
   const [isDarkMode, setIsDarkMode] =
-    useState(true);
+    useState(false);
 
   const [completedTopics, setCompletedTopics] =
     useState<string[]>([]);
@@ -501,14 +501,12 @@ export default function DSAStudio() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const savedTheme = window.localStorage.getItem("algorhythm_theme");
       const savedName = window.localStorage.getItem("algorhythm_name");
       const savedEmail = window.localStorage.getItem("algorhythm_email");
       const savedTopics = window.localStorage.getItem("algorhythm_completed_topics");
       const savedBestScore = window.localStorage.getItem("algorhythm_quiz_best");
       const savedAttempts = window.localStorage.getItem("algorhythm_quiz_attempts");
 
-      if (savedTheme === "dark") setIsDarkMode(true);
       if (savedName) setProfileName(savedName);
       if (savedEmail) setProfileEmail(savedEmail);
       if (savedTopics) {
@@ -1064,6 +1062,12 @@ export default function DSAStudio() {
     event.preventDefault();
     setAuthError("");
 
+    const normalizedEmail = profileEmail.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setAuthError("Enter your email address.");
+      return;
+    }
+
     if (password.length < 8) {
       setAuthError("Use a password with at least 8 characters.");
       return;
@@ -1080,18 +1084,20 @@ export default function DSAStudio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: profileName,
-          email: profileEmail,
+          name: profileName.trim(),
+          email: normalizedEmail,
           password,
         }),
       });
       const payload = await response.json() as { error?: string; requiresEmailConfirmation?: boolean };
       if (!response.ok) {
-        setAuthError(
-          response.status === 409
-            ? "An account with this email already exists. Switch to Sign in or use another email."
-            : payload.error ?? "Unable to authenticate."
-        );
+        if (response.status === 409) {
+          setAuthMode("signin");
+          setConfirmPassword("");
+          setAuthError("This email already has an account. Sign in with your password.");
+        } else {
+          setAuthError(payload.error ?? "Unable to authenticate.");
+        }
         return;
       }
       if (payload.requiresEmailConfirmation) {
@@ -1221,9 +1227,9 @@ export default function DSAStudio() {
             <div className="flex items-center justify-between"><button type="button" onClick={() => setHasStarted(false)} className="text-xs font-semibold text-slate-400 hover:text-slate-700">← Back to overview</button><ThemeToggle isDarkMode={isDarkMode} onToggle={() => setIsDarkMode((value) => !value)} /></div>
             <div className="mt-12 max-w-sm"><div className="mb-8 grid grid-cols-2 rounded-xl bg-slate-100 p-1"><button type="button" onClick={() => { setAuthMode("signin"); setAuthError(""); }} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${authMode === "signin" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>Sign in</button><button type="button" onClick={() => { setAuthMode("signup"); setAuthError(""); }} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${authMode === "signup" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>Create account</button></div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600">{authMode === "signup" ? "New to AlgoRhythm" : "Welcome back"}</p><h2 className="mt-3 text-3xl font-semibold tracking-tight">{authMode === "signup" ? "Create your account" : "Sign in to continue"}</h2><p className="mt-3 text-sm leading-6 text-slate-500">{authMode === "signup" ? "Build a personal learning path and keep your progress in one place." : "Your learning path is waiting. Continue with your saved session."}</p>
               <div className="mt-8 space-y-4">
-                {authMode === "signup" && <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Name</span><input required minLength={2} maxLength={80} value={profileName} onChange={(event) => setProfileName(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>}
-                <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Email address</span><input required type="email" value={profileEmail} onChange={(event) => setProfileEmail(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>
-                <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Password</span><div className="relative"><input required minLength={8} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-11 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div><span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Use a unique password with 8 or more characters.</span></label>
+                {authMode === "signup" && <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Name</span><input autoComplete="name" required minLength={2} maxLength={80} value={profileName} onChange={(event) => setProfileName(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>}
+                <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Email address</span><input autoFocus={authMode === "signin"} autoComplete="email" required type="email" value={profileEmail} onChange={(event) => setProfileEmail(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>
+                <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Password</span><div className="relative"><input autoComplete={authMode === "signin" ? "current-password" : "new-password"} required minLength={8} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-11 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div><span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Use a unique password with 8 or more characters.</span></label>
                 {authMode === "signup" && <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Confirm password</span><input required minLength={8} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>}
                 {authError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{authError}</p>}
                 <button disabled={authPending} type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60">{authPending ? "Connecting securely..." : authMode === "signup" ? "Create AlgoRhythm account" : "Enter AlgoRhythm"} {!authPending && <ArrowRight className="h-4 w-4" />}</button>
