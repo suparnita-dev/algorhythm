@@ -24,7 +24,7 @@ npm install
 Copy-Item .env.example .env.local
 ```
 
-Set `AUTH_SECRET` in `.env.local` to a long random value for signed sessions. Add an OpenAI key to enable live, multi-turn tutor responses; without it, the local tutor fallback remains available but is intentionally limited and is not equivalent to a hosted generative model.
+Set `AUTH_SECRET` in `.env.local` to a long random value for signed sessions. Vercel deployments must define `AUTH_SECRET` in the project environment as well. Add an OpenAI key to enable live, multi-turn tutor responses; without it, the local tutor fallback remains available but is intentionally limited and is not equivalent to a hosted generative model.
 
 Start the development server:
 

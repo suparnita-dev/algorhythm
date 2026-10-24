@@ -442,10 +442,10 @@ export default function DSAStudio() {
     useState(false);
 
   const [profileName, setProfileName] =
-    useState("Alex Morgan");
+    useState("");
 
   const [profileEmail, setProfileEmail] =
-    useState("alex@example.com");
+    useState("");
 
   const [password, setPassword] =
     useState("");
@@ -1087,7 +1087,11 @@ export default function DSAStudio() {
       });
       const payload = await response.json() as { error?: string; requiresEmailConfirmation?: boolean };
       if (!response.ok) {
-        setAuthError(payload.error ?? "Unable to authenticate.");
+        setAuthError(
+          response.status === 409
+            ? "An account with this email already exists. Switch to Sign in or use another email."
+            : payload.error ?? "Unable to authenticate."
+        );
         return;
       }
       if (payload.requiresEmailConfirmation) {

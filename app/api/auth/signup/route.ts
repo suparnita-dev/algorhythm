@@ -10,6 +10,12 @@ const signupSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    if (process.env.NODE_ENV === "production" && !process.env.AUTH_SECRET?.trim()) {
+      return NextResponse.json(
+        { error: "Authentication is not configured on this server. Set AUTH_SECRET and try again." },
+        { status: 503 }
+      );
+    }
     const input = signupSchema.parse(await request.json());
     const email = input.email.toLowerCase();
     if (findUserByEmail(email)) return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
