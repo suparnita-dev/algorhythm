@@ -1,18 +1,23 @@
 # AlgoRhythm
 
-**Visualize. Understand. Practice. Master.**
+**Learn the logic. Craft the solution.**
 
-AlgoRhythm is an interactive data-structures and algorithms workspace. It turns algorithm execution into inspectable steps with synchronized pseudocode, visual state, complexity context, quizzes, and an optional AI tutor.
+[![CI](https://github.com/suparnita-dev/algorhythm/actions/workflows/ci.yml/badge.svg)](https://github.com/suparnita-dev/algorhythm/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/live_demo-open-4f46e5)](https://dsa-platform-ten.vercel.app)
 
-## Implemented features
+AlgoRhythm is a visual learning workspace for data structures and algorithms. Instead of reading a static explanation, learners can inspect each operation, follow synchronized pseudocode, test their intuition, and ask for targeted guidance.
 
-- Interactive workspaces for arrays, strings, matrices, linked lists, stacks, queues, trees, graphs, Big O, and advanced learning topics.
-- Deterministic execution steps with play, pause, next, previous, reset, keyboard shortcuts, and adjustable playback speed.
-- Synchronized code-line highlighting and operation-focused visualization panels.
-- Local progress, theme preference, quiz attempts, and best score persistence for the current browser.
-- Server-side demo authentication with signed HttpOnly sessions and scrypt password hashing.
-- Protected conversational tutor route with up to 12 recent messages, current workspace context, provider error fallback, and deterministic local guidance when `OPENAI_API_KEY` is unavailable.
-- Responsive shell with dark developer-tool styling, visible focus states, and reduced-motion support.
+**[Open the live demo](https://dsa-platform-ten.vercel.app)** · **[View the source](https://github.com/suparnita-dev/algorhythm)**
+
+## What it includes
+
+- **Visual algorithm workspaces** for arrays, strings, matrices, linked lists, stacks, queues, trees, graphs, Big O, recursion, and advanced topics.
+- **Step-by-step execution** with play, pause, next, previous, reset, keyboard shortcuts, and adjustable playback speed.
+- **Synchronized explanations** with highlighted pseudocode, operation details, complexity context, and visual state.
+- **Practice and feedback** through lesson quizzes, score tracking, and progress summaries.
+- **Optional tutoring** through a protected conversational route with an OpenAI provider and a deterministic local fallback.
+- **Responsive, accessible UI** with visible focus states, reduced-motion support, light mode by default, and an optional dark theme.
+- **Demo authentication** using signed HttpOnly sessions and scrypt password hashing.
 
 ## Local setup
 
@@ -24,7 +29,7 @@ npm install
 Copy-Item .env.example .env.local
 ```
 
-Set `AUTH_SECRET` in `.env.local` to a long random value for signed sessions. Vercel deployments must define `AUTH_SECRET` in the project environment as well. Add an OpenAI key to enable live, multi-turn tutor responses; without it, the local tutor fallback remains available but is intentionally limited and is not equivalent to a hosted generative model.
+Set `AUTH_SECRET` in `.env.local` to a long random value for signed sessions. Vercel deployments must define `AUTH_SECRET` in the project environment as well. Add an OpenAI key to enable live, multi-turn tutor responses. Without it, the local tutor fallback remains available for offline development.
 
 Start the development server:
 
@@ -34,7 +39,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Architecture
+## Project structure
 
 ```text
 app/                 App Router entrypoint and API routes
@@ -46,7 +51,7 @@ stores/               Client state stores
 types/                Shared TypeScript contracts
 ```
 
-The algorithm builders are kept separate from presentation. Each builder returns typed, deterministic snapshots consumed by the workspace and visualization components.
+Algorithm builders are kept separate from presentation. Each builder returns typed, deterministic snapshots consumed by the workspace and visualization components.
 
 ## Backend routes
 
@@ -65,19 +70,27 @@ npm test
 npm run build
 ```
 
-The Vitest suite covers algorithm snapshots, edge cases, Big O step counts, password hashing, and tampered sessions. Browser-level verification should still cover authentication screens, playback controls, quiz completion, malformed local storage, conversational tutor history, and provider fallback behavior.
+The Vitest suite covers algorithm snapshots, edge cases, Big O step counts, password hashing, and tampered sessions. CI runs linting, type-checking, unit tests, and the production build on every push and pull request.
 
 ## Deployment and security
 
 Set a strong random `AUTH_SECRET` in production and configure `OPENAI_API_KEY` only as a server environment variable. Never commit `.env.local`, `AUTH_SECRET`, or OpenAI keys.
 
-The current demo auth store is process-local and browser progress uses localStorage. This is suitable for demonstration and local development, not durable multi-instance production use. Before production deployment, replace it with durable persistence and server-authorized progress APIs. Add a distributed rate limiter if the tutor endpoint is exposed through multiple instances.
+The current demo auth store is process-local and browser progress uses localStorage. This is suitable for demonstration and portfolio review, not durable multi-instance production use. Before scaling the application, replace it with durable persistence and server-authorized progress APIs. Add a distributed rate limiter if the tutor endpoint is exposed through multiple instances.
 
-## Known limitations and roadmap
+## Current limitations
 
 - Account and progress data are not durable across server restarts or shared across devices.
 - Analytics are currently derived from browser-local activity; there is no server-backed event history.
-- The local tutor is a deterministic offline fallback. ChatGPT/Claude-like open-ended responses require a valid server-side `OPENAI_API_KEY`; the application does not fabricate AI output when that provider is unavailable.
+- The local tutor is a deterministic offline fallback. Open-ended provider responses require a valid server-side `OPENAI_API_KEY`.
 - Tutor responses are not persisted and live-provider behavior is unverified without an API key.
-- Automated unit, integration, and end-to-end suites are not yet configured.
-- A production follow-up should add durable persistence, RLS-backed user data, broader algorithm-specific tests, and CI.
+
+## Deployment
+
+The production demo is deployed on Vercel:
+
+```text
+https://dsa-platform-ten.vercel.app
+```
+
+For a new deployment, configure `AUTH_SECRET` in the Vercel Production environment before publishing. `OPENAI_API_KEY` is optional because the application includes an offline tutor fallback.
