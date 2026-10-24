@@ -21,6 +21,10 @@ export async function POST(request: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Enter a valid name, email, and password of at least 8 characters." }, { status: 400 });
     }
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: "The signup request was invalid. Please try again." }, { status: 400 });
+    }
+    console.error("Signup failed:", error);
     return NextResponse.json({ error: "Unable to create the account." }, { status: 500 });
   }
 }
