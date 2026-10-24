@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 const scrypt = promisify(nodeScrypt);
 const SESSION_COOKIE = "algocraft_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
-const AUTH_SECRET = process.env.AUTH_SECRET ?? "local-development-secret-change-me";
+const DEVELOPMENT_AUTH_SECRET = "local-development-secret-change-me";
 
 type UserRecord = {
   id: string;
@@ -40,7 +40,11 @@ function decode(value: string) {
 }
 
 function sign(value: string) {
-  return createHmac("sha256", AUTH_SECRET).update(value).digest("base64url");
+  const secret = process.env.AUTH_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SECRET must be configured in production.");
+  }
+  return createHmac("sha256", secret ?? DEVELOPMENT_AUTH_SECRET).update(value).digest("base64url");
 }
 
 function makeSession(userId: string) {

@@ -4,6 +4,13 @@ import type {
   AlgorithmStep,
 } from "@/types/algorithm";
 
+export interface AdvancedAlgorithmInput {
+  values?: number[];
+  target?: number;
+  number?: number;
+  mask?: number;
+}
+
 function makeStep(
   step: number,
   description: string,
@@ -38,8 +45,8 @@ const examples: Record<AdvancedTopic, { name: string; description: string; code:
   },
   "sorting-searching": {
     name: "Sort and Search",
-    description: "Compare neighboring values while sorting, then narrow the search range.",
-    code: "values.sort((a, b) => a - b);\nlet left = 0;\nlet right = values.length - 1;",
+    description: "Sort the input, then narrow the binary-search range around the target.",
+    code: "values.sort((a, b) => a - b);\nlet left = 0;\nlet right = values.length - 1;\nwhile (left <= right) {\n  const middle = Math.floor((left + right) / 2);\n}",
   },
   greedy: {
     name: "Greedy Selection",
@@ -58,24 +65,91 @@ const examples: Record<AdvancedTopic, { name: string; description: string; code:
   },
 };
 
-function buildSteps(topic: AdvancedTopic): AlgorithmStep[] {
-  const values = topic === "bit-manipulation" ? [5, 3, 1, 0] : [1, 2, 3, 4, 5];
-  const descriptions: Record<AdvancedTopic, string[]> = {
-    recursion: ["Call factorial(5).", "Reduce to factorial(4).", "Reduce to factorial(3).", "Reach the base case.", "Return values through the call stack."],
-    backtracking: ["Choose the first candidate.", "Move deeper with the current choice.", "Reject an invalid partial solution.", "Undo the choice and try the next candidate.", "Keep the complete valid path."],
-    "divide-and-conquer": ["Divide the input into two halves.", "Recursively solve the left half.", "Recursively solve the right half.", "Merge two sorted halves.", "The combined result is sorted."],
-    "sorting-searching": ["Compare two values.", "Swap values that are out of order.", "Narrow the binary-search range.", "Check the middle value.", "The target position is determined."],
-    greedy: ["Sort choices by their local benefit.", "Select the best choice that fits.", "Update the remaining capacity.", "Skip a choice that violates the constraint.", "The greedy result is complete."],
-    "dynamic-programming": ["Define the initial state.", "Fill the next subproblem.", "Reuse a previously computed state.", "Apply the state transition.", "The final state contains the answer."],
-    "bit-manipulation": ["Read the binary representation.", "Apply bitwise AND with a mask.", "Toggle bits with XOR.", "Shift bits to the left.", "The transformed bit pattern is ready."],
-  };
-  return descriptions[topic].map((description, index) => makeStep(index, description, values, [index % values.length], index + 1));
+function buildSteps(
+  topic: AdvancedTopic,
+  input: Required<AdvancedAlgorithmInput>
+): AlgorithmStep[] {
+  const values = input.values.length > 0 ? input.values : [1, 2, 3, 4, 5];
+  const steps: AlgorithmStep[] = [];
+
+  if (topic === "recursion") {
+    const n = Math.max(0, Math.min(12, Math.trunc(input.number)));
+    for (let value = n, step = 0; value >= 1; value -= 1, step += 1) {
+      steps.push(makeStep(step, `Call factorial(${value}) and check whether it is the base case.`, [value], [0], value <= 1 ? 2 : 4));
+    }
+    steps.push(makeStep(steps.length, `Return through the call stack to calculate factorial(${n}).`, [n], [0], 4));
+    return steps;
+  }
+
+  if (topic === "sorting-searching") {
+    const sorted = [...values].sort((a, b) => a - b);
+    let left = 0;
+    let right = sorted.length - 1;
+    let step = 0;
+    while (left <= right) {
+      const middle = Math.floor((left + right) / 2);
+      steps.push(makeStep(step, `Check ${sorted[middle]} against target ${input.target}.`, sorted, [middle], 5));
+      if (sorted[middle] === input.target) break;
+      if (sorted[middle] < input.target) left = middle + 1;
+      else right = middle - 1;
+      step += 1;
+    }
+    steps.unshift(makeStep(0, "Sort the values before starting binary search.", sorted, [], 1));
+    return steps.map((current, index) => ({ ...current, step: index }));
+  }
+
+  if (topic === "divide-and-conquer") {
+    const sorted = [...values].sort((a, b) => a - b);
+    return [
+      makeStep(0, `Divide ${values.length} values around the midpoint.`, values, [], 3),
+      makeStep(1, "Solve the left half recursively.", values, [0, Math.max(0, Math.floor(values.length / 2) - 1)], 4),
+      makeStep(2, "Solve the right half recursively.", values, [Math.floor(values.length / 2), values.length - 1], 4),
+      makeStep(3, "Merge the sorted halves.", sorted, sorted.map((_, index) => index), 5),
+    ];
+  }
+
+  if (topic === "backtracking") {
+    return values.map((value, index) =>
+      makeStep(index, `Choose ${value}, explore the partial solution, then backtrack if it cannot continue.`, values, [index], index % 2 === 0 ? 4 : 6)
+    );
+  }
+
+  if (topic === "greedy") {
+    const sorted = [...values].sort((a, b) => b - a);
+    return sorted.map((value, index) =>
+      makeStep(index, `Select the highest remaining value ${value} as the next local choice.`, sorted, [index], 2)
+    );
+  }
+
+  if (topic === "dynamic-programming") {
+    const table = [0];
+    return values.map((value, index) => {
+      table.push((table[index] ?? 0) + value);
+      return makeStep(index, `Reuse the previous state and compute dp[${index + 1}] = ${table[index + 1]}.`, table, [index + 1], 3);
+    });
+  }
+
+  const value = Math.max(0, Math.trunc(input.number));
+  const mask = Math.max(0, Math.trunc(input.mask));
+  return [
+    makeStep(0, `Inspect ${value} in binary and apply mask ${mask}.`, [value, mask], [0, 1], 1),
+    makeStep(1, `Use AND to test whether the mask bit is present.`, [value & mask, mask], [0], 1),
+    makeStep(2, `Use XOR to toggle the selected bit.`, [value ^ mask, mask], [0], 2),
+    makeStep(3, `Shift the value left by one position.`, [value << 1, mask], [0], 3),
+  ];
 }
 
 export function buildAdvancedAlgorithm(
-  topic: AdvancedTopic
+  topic: AdvancedTopic,
+  input: AdvancedAlgorithmInput = {}
 ): AlgorithmDefinition {
   const example = examples[topic];
+  const normalized: Required<AdvancedAlgorithmInput> = {
+    values: input.values ?? [1, 2, 3, 4, 5],
+    target: input.target ?? 3,
+    number: input.number ?? 5,
+    mask: input.mask ?? 1,
+  };
   return {
     id: topic,
     name: example.name,
@@ -83,6 +157,6 @@ export function buildAdvancedAlgorithm(
     description: example.description,
     language: "javascript",
     code: example.code,
-    steps: buildSteps(topic),
+    steps: buildSteps(topic, normalized),
   };
 }

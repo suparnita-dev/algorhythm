@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -137,26 +136,33 @@
 
 .theme-dark {
   color-scheme: dark;
-  background-color: #0b1020 !important;
-  color: #e5e7eb;
+  background-color: #080b14 !important;
+  color: #f3f5fc;
+  --product-bg: #080b14;
+  --product-surface: #101625;
+  --product-elevated: #151d2e;
+  --product-border: #263248;
+  --product-primary: #6d7cff;
+  --product-secondary: #39b8ff;
+  --product-muted: #a0abc0;
 }
 
 .theme-dark .bg-slate-50,
 .theme-dark .bg-\[\#f7f8fc\] {
-  background-color: #0f172a !important;
+  background-color: #080b14 !important;
 }
 
 .theme-dark .bg-white {
-  background-color: #111827 !important;
+  background-color: #101625 !important;
 }
 
 .theme-dark .bg-slate-950 {
-  background-color: #020617 !important;
+  background-color: #080b14 !important;
 }
 
 .theme-dark .bg-slate-100,
 .theme-dark .bg-slate-200 {
-  background-color: #1e293b !important;
+  background-color: #151d2e !important;
 }
 
 .theme-dark .bg-indigo-50,
@@ -199,13 +205,13 @@
 
 .theme-dark .bg-\[\#fcfbf8\],
 .theme-dark .bg-stone-100\/60 {
-  background-color: #111827 !important;
+  background-color: #101625 !important;
 }
 
 .theme-dark .border-slate-100,
 .theme-dark .border-slate-200,
 .theme-dark .border-stone-200 {
-  border-color: #334155 !important;
+  border-color: #263248 !important;
 }
 
 .theme-dark input,
@@ -218,6 +224,32 @@
 .theme-dark input::placeholder,
 .theme-dark textarea::placeholder {
   color: #64748b;
+}
+
+.theme-dark .shadow-sm,
+.theme-dark .shadow-lg,
+.theme-dark .shadow-xl,
+.theme-dark .shadow-2xl {
+  --tw-shadow-color: rgb(0 0 0 / 0.35);
+}
+
+.theme-dark button:not(:disabled):focus-visible,
+.theme-dark input:focus-visible,
+.theme-dark textarea:focus-visible,
+.theme-dark select:focus-visible {
+  outline: 2px solid #6d7cff;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .algocraft-logo {

@@ -64,6 +64,11 @@ import type {
 
 import VisualizationCanvas from "@/components/visualization/visualization-canvas";
 
+type TutorMessage = {
+  role: "tutor" | "learner";
+  text: string;
+};
+
 /* =========================================================
    DEFAULT ARRAY
 ========================================================= */
@@ -391,6 +396,18 @@ export default function DSAStudio() {
   const [inputSize, setInputSize] =
     useState("8");
 
+  const [advancedInput, setAdvancedInput] =
+    useState("1, 2, 3, 4, 5");
+
+  const [advancedTarget, setAdvancedTarget] =
+    useState("3");
+
+  const [advancedNumber, setAdvancedNumber] =
+    useState("5");
+
+  const [advancedMask, setAdvancedMask] =
+    useState("1");
+
   const [currentStep, setCurrentStep] =
     useState(0);
 
@@ -410,7 +427,7 @@ export default function DSAStudio() {
     useState(true);
 
   const [isDarkMode, setIsDarkMode] =
-    useState(false);
+    useState(true);
 
   const [completedTopics, setCompletedTopics] =
     useState<string[]>([]);
@@ -466,8 +483,11 @@ export default function DSAStudio() {
   const [tutorInput, setTutorInput] =
     useState("");
 
+  const [tutorPending, setTutorPending] =
+    useState(false);
+
   const [tutorMessages, setTutorMessages] =
-    useState([
+    useState<TutorMessage[]>([
       {
         role: "tutor",
         text: "Welcome back. I can explain the current step, compare complexities, or give you a hint.",
@@ -491,7 +511,16 @@ export default function DSAStudio() {
       if (savedTheme === "dark") setIsDarkMode(true);
       if (savedName) setProfileName(savedName);
       if (savedEmail) setProfileEmail(savedEmail);
-      if (savedTopics) setCompletedTopics(JSON.parse(savedTopics) as string[]);
+      if (savedTopics) {
+        try {
+          const parsedTopics: unknown = JSON.parse(savedTopics);
+          if (Array.isArray(parsedTopics) && parsedTopics.every((topic): topic is string => typeof topic === "string")) {
+            setCompletedTopics(parsedTopics);
+          }
+        } catch {
+          window.localStorage.removeItem("algorhythm_completed_topics");
+        }
+      }
       if (savedBestScore) setQuizBestScore(Number(savedBestScore));
       if (savedAttempts) setQuizAttempts(Number(savedAttempts));
 
@@ -554,6 +583,14 @@ export default function DSAStudio() {
 
     return values.length > 0 ? values : [10, 20, 30, 40];
   }, [linkedListInput]);
+
+  const parsedAdvancedInput = useMemo(() => {
+    const values = advancedInput
+      .split(",")
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isFinite(item));
+    return values.length > 0 ? values : [1, 2, 3, 4, 5];
+  }, [advancedInput]);
 
   /* =======================================================
      BUILD ALGORITHM
@@ -630,7 +667,12 @@ export default function DSAStudio() {
         topic === "dynamic-programming" ||
         topic === "bit-manipulation"
       ) {
-        return buildAdvancedAlgorithm(topic);
+        return buildAdvancedAlgorithm(topic, {
+          values: parsedAdvancedInput,
+          target: Number(advancedTarget),
+          number: Number(advancedNumber),
+          mask: Number(advancedMask),
+        });
       }
 
       return buildArrayAlgorithm(
@@ -664,6 +706,10 @@ export default function DSAStudio() {
       linkedListTarget,
       structureValue,
       inputSize,
+      parsedAdvancedInput,
+      advancedTarget,
+      advancedNumber,
+      advancedMask,
     ]);
 
   /* =======================================================
@@ -943,12 +989,14 @@ export default function DSAStudio() {
 
   const sendTutorMessage = async () => {
     const prompt = tutorInput.trim();
-    if (!prompt) return;
+    if (!prompt || tutorPending) return;
 
-    setTutorMessages((messages) => [
-      ...messages,
+    setTutorPending(true);
+    const nextMessages: TutorMessage[] = [
+      ...tutorMessages,
       { role: "learner", text: prompt },
-    ]);
+    ];
+    setTutorMessages(nextMessages);
     setTutorInput("");
 
     try {
@@ -959,18 +1007,29 @@ export default function DSAStudio() {
           message: prompt,
           topic,
           step: currentAlgorithmStep.description,
+          messages: nextMessages.slice(-12).map((message) => ({
+            role: message.role === "learner" ? "user" : "assistant",
+            content: message.text,
+          })),
         }),
       });
       const payload = await response.json() as { response?: string; error?: string };
-      setTutorMessages((messages) => [
-        ...messages,
-        { role: "tutor", text: payload.response ?? payload.error ?? "The tutor is unavailable right now." },
+      setTutorMessages([
+        ...nextMessages,
+        {
+          role: "tutor",
+          text: response.ok
+            ? payload.response ?? "The tutor returned an empty response."
+            : payload.error ?? "The tutor is unavailable right now.",
+        },
       ]);
     } catch {
-      setTutorMessages((messages) => [
-        ...messages,
+      setTutorMessages([
+        ...nextMessages,
         { role: "tutor", text: "The tutor is offline. Try tracing the highlighted step and ask what invariant it preserves." },
       ]);
+    } finally {
+      setTutorPending(false);
     }
   };
 
@@ -1037,6 +1096,9 @@ export default function DSAStudio() {
         return;
       }
       setIsSignedIn(true);
+      setAuthOpen(false);
+      setPassword("");
+      setConfirmPassword("");
     } catch {
       setAuthError("The authentication service is unavailable.");
     } finally {
@@ -1125,7 +1187,7 @@ export default function DSAStudio() {
               <h1 className="max-w-2xl text-5xl font-semibold leading-[1.02] tracking-[-0.04em] text-slate-950 sm:text-6xl">Build the intuition behind every algorithm.</h1>
               <p className="mt-6 max-w-xl text-lg leading-8 text-slate-500">A focused workspace for understanding data structures, tracing algorithms, and turning confusion into confident problem solving.</p>
               <div className="mt-8 flex flex-wrap items-center gap-3"><button onClick={() => setHasStarted(true)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-300 transition hover:bg-indigo-700">Start learning <ArrowRight className="h-4 w-4" /></button><span className="text-xs text-slate-400">Free interactive workspace · No setup</span></div>
-              <div className="mt-12 grid max-w-xl grid-cols-3 gap-5 border-t border-slate-200 pt-5"><div><p className="text-xl font-semibold">24</p><p className="mt-1 text-xs text-slate-500">guided chapters</p></div><div><p className="text-xl font-semibold">80+</p><p className="mt-1 text-xs text-slate-500">visual steps</p></div><div><p className="text-xl font-semibold">1:1</p><p className="mt-1 text-xs text-slate-500">tutor mindset</p></div></div>
+              <div className="mt-12 grid max-w-xl grid-cols-3 gap-5 border-t border-slate-200 pt-5"><div><p className="text-xl font-semibold">{totalTopics}</p><p className="mt-1 text-xs text-slate-500">learning modules</p></div><div><p className="text-xl font-semibold">Step-by-step</p><p className="mt-1 text-xs text-slate-500">visual execution</p></div><div><p className="text-xl font-semibold">Optional</p><p className="mt-1 text-xs text-slate-500">AI tutoring</p></div></div>
             </section>
 
             <section className="relative mx-auto w-full max-w-lg">
@@ -1136,7 +1198,7 @@ export default function DSAStudio() {
               <div className="algocraft-topic-float algocraft-topic-float-four"><span>⚙️</span><div><strong>Complexity</strong><small>Measure growth</small></div></div>
               <div className="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl shadow-slate-300/50">
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div className="flex gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose-300" /><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div><span className="font-mono text-[10px] text-slate-400">workspace / arrays</span></div>
-                <div className="grid gap-4 bg-slate-50 p-5 sm:grid-cols-[0.7fr_1.3fr]"><div className="space-y-2 rounded-xl bg-white p-3"><p className="mb-3 text-[9px] font-bold uppercase tracking-widest text-slate-400">Learning path</p>{["Arrays", "Linked Lists", "Trees", "Graphs"].map((item, index) => <div key={item} className={`rounded-lg px-3 py-2 text-xs font-semibold ${index === 0 ? "bg-indigo-50 text-indigo-700" : "text-slate-400"}`}>{item}</div>)}</div><div className="space-y-4"><div className="rounded-xl bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">Live visualization</p><div className="mt-8 flex items-center justify-center gap-2">{[10, 20, 30, 40].map((value, index) => <div key={value} className="flex items-center gap-2"><div className={`flex h-12 w-12 items-center justify-center rounded-lg border text-sm font-bold ${index === 1 ? "border-indigo-400 bg-indigo-50 text-indigo-700 shadow-lg shadow-indigo-100" : "border-slate-200 bg-slate-50 text-slate-600"}`}>{value}</div>{index < 3 && <span className="text-slate-300">→</span>}</div>)}</div><p className="mt-8 text-center text-xs text-slate-400">Compare. Predict. Execute.</p></div><div className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-slate-950 p-4 text-white"><p className="text-[10px] uppercase tracking-widest text-indigo-300">Progress</p><p className="mt-3 text-2xl font-semibold">68%</p><div className="mt-3 h-1 rounded-full bg-white/10"><div className="h-full w-2/3 rounded-full bg-cyan-300" /></div></div><div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4"><BrainCircuit className="h-4 w-4 text-indigo-600" /><p className="mt-3 text-xs font-semibold text-indigo-900">Tutor ready</p><p className="mt-1 text-[10px] leading-4 text-indigo-700/70">Ask why, not just what.</p></div></div></div></div>
+                <div className="grid gap-4 bg-slate-50 p-5 sm:grid-cols-[0.7fr_1.3fr]"><div className="space-y-2 rounded-xl bg-white p-3"><p className="mb-3 text-[9px] font-bold uppercase tracking-widest text-slate-400">Learning path</p>{["Arrays", "Linked Lists", "Trees", "Graphs"].map((item, index) => <div key={item} className={`rounded-lg px-3 py-2 text-xs font-semibold ${index === 0 ? "bg-indigo-50 text-indigo-700" : "text-slate-400"}`}>{item}</div>)}</div><div className="space-y-4"><div className="rounded-xl bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">Live visualization</p><div className="mt-8 flex items-center justify-center gap-2">{[10, 20, 30, 40].map((value, index) => <div key={value} className="flex items-center gap-2"><div className={`flex h-12 w-12 items-center justify-center rounded-lg border text-sm font-bold ${index === 1 ? "border-indigo-400 bg-indigo-50 text-indigo-700 shadow-lg shadow-indigo-100" : "border-slate-200 bg-slate-50 text-slate-600"}`}>{value}</div>{index < 3 && <span className="text-slate-300">→</span>}</div>)}</div><p className="mt-8 text-center text-xs text-slate-400">Compare. Predict. Execute.</p></div><div className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-slate-950 p-4 text-white"><p className="text-[10px] uppercase tracking-widest text-indigo-300">Your progress</p><p className="mt-3 text-2xl font-semibold">{completedCount}/{totalTopics}</p><div className="mt-3 h-1 rounded-full bg-white/10"><div className="h-full rounded-full bg-cyan-300" style={{ width: `${progressPercent}%` }} /></div></div><div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4"><BrainCircuit className="h-4 w-4 text-indigo-600" /><p className="mt-3 text-xs font-semibold text-indigo-900">Tutor ready</p><p className="mt-1 text-[10px] leading-4 text-indigo-700/70">Ask why, not just what.</p></div></div></div></div>
               </div>
             </section>
           </div>
@@ -1155,13 +1217,13 @@ export default function DSAStudio() {
             <div className="flex items-center justify-between"><button type="button" onClick={() => setHasStarted(false)} className="text-xs font-semibold text-slate-400 hover:text-slate-700">← Back to overview</button><ThemeToggle isDarkMode={isDarkMode} onToggle={() => setIsDarkMode((value) => !value)} /></div>
             <div className="mt-12 max-w-sm"><div className="mb-8 grid grid-cols-2 rounded-xl bg-slate-100 p-1"><button type="button" onClick={() => { setAuthMode("signin"); setAuthError(""); }} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${authMode === "signin" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>Sign in</button><button type="button" onClick={() => { setAuthMode("signup"); setAuthError(""); }} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${authMode === "signup" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>Create account</button></div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600">{authMode === "signup" ? "New to AlgoRhythm" : "Welcome back"}</p><h2 className="mt-3 text-3xl font-semibold tracking-tight">{authMode === "signup" ? "Create your account" : "Sign in to continue"}</h2><p className="mt-3 text-sm leading-6 text-slate-500">{authMode === "signup" ? "Build a personal learning path and keep your progress in one place." : "Your learning path is waiting. Continue with your saved session."}</p>
               <div className="mt-8 space-y-4">
-                <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Name</span><input required value={profileName} onChange={(event) => setProfileName(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>
+                {authMode === "signup" && <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Name</span><input required minLength={2} maxLength={80} value={profileName} onChange={(event) => setProfileName(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>}
                 <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Email address</span><input required type="email" value={profileEmail} onChange={(event) => setProfileEmail(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>
                 <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Password</span><div className="relative"><input required minLength={8} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-11 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div><span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Use a unique password with 8 or more characters.</span></label>
                 {authMode === "signup" && <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Confirm password</span><input required minLength={8} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>}
                 {authError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{authError}</p>}
                 <button disabled={authPending} type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60">{authPending ? "Connecting securely..." : authMode === "signup" ? "Create AlgoRhythm account" : "Enter AlgoRhythm"} {!authPending && <ArrowRight className="h-4 w-4" />}</button>
-              </div><p className="mt-5 text-center text-[11px] leading-5 text-slate-400">Passwords are validated in the browser for this demo. Production auth must hash and verify them on a server.</p>
+              </div><p className="mt-5 text-center text-[11px] leading-5 text-slate-400">Passwords are hashed and verified by the server. Use a unique password for this demo.</p>
             </div>
           </form>
         </div>
@@ -2065,6 +2127,79 @@ export default function DSAStudio() {
                 </label>
               )}
 
+              {(topic === "recursion" ||
+                topic === "backtracking" ||
+                topic === "divide-and-conquer" ||
+                topic === "sorting-searching" ||
+                topic === "greedy" ||
+                topic === "dynamic-programming") && (
+                <label className="block md:col-span-2">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-600">
+                    Input values
+                  </span>
+                  <input
+                    value={advancedInput}
+                    onChange={(event) => setAdvancedInput(event.target.value)}
+                    placeholder="1, 2, 3, 4, 5"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <span className="mt-1 block text-[11px] text-slate-400">
+                    Enter comma-separated numbers, including duplicates or negative values.
+                  </span>
+                </label>
+              )}
+
+              {topic === "sorting-searching" && (
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Search target</span>
+                  <input
+                    type="number"
+                    value={advancedTarget}
+                    onChange={(event) => setAdvancedTarget(event.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  />
+                </label>
+              )}
+
+              {topic === "recursion" && (
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Recursive n</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="12"
+                    value={advancedNumber}
+                    onChange={(event) => setAdvancedNumber(event.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  />
+                </label>
+              )}
+
+              {topic === "bit-manipulation" && (
+                <>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-slate-600">Value</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={advancedNumber}
+                      onChange={(event) => setAdvancedNumber(event.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-slate-600">Bit mask</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={advancedMask}
+                      onChange={(event) => setAdvancedMask(event.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                    />
+                  </label>
+                </>
+              )}
+
             </div>
 
           </div>
@@ -2198,11 +2333,12 @@ export default function DSAStudio() {
 
               <div className="ml-auto flex items-center gap-3">
 
-                <span className="text-xs text-slate-400">
-                  Speed
-                </span>
+                <span className="text-xs text-slate-400">Speed</span>
+                <span className="text-[10px] text-slate-400">Slow</span>
 
                 <input
+                  aria-label="Playback speed from slow to fast"
+                  dir="rtl"
                   type="range"
                   min="150"
                   max="1500"
@@ -2217,6 +2353,10 @@ export default function DSAStudio() {
                   }
                   className="w-28 accent-indigo-600"
                 />
+                <span className="text-[10px] text-slate-400">Fast</span>
+                <span className="w-10 text-right text-[10px] font-semibold text-indigo-600">
+                  {speed >= 1100 ? "Slow" : speed <= 400 ? "Fast" : "Normal"}
+                </span>
 
               </div>
 
@@ -2462,13 +2602,17 @@ export default function DSAStudio() {
                 value={tutorInput}
                 onChange={(event) => setTutorInput(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") sendTutorMessage();
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    sendTutorMessage();
+                  }
                 }}
                 placeholder="Ask for a hint..."
+                disabled={tutorPending}
                 className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               />
-              <button onClick={sendTutorMessage} aria-label="Send question" className="rounded-lg bg-indigo-600 p-2.5 text-white transition hover:bg-indigo-700">
-                <Send className="h-3.5 w-3.5" />
+              <button onClick={sendTutorMessage} disabled={tutorPending} aria-label="Send question" className="rounded-lg bg-indigo-600 p-2.5 text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-50">
+                {tutorPending ? <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Send className="h-3.5 w-3.5" />}
               </button>
             </div>
 
@@ -2512,12 +2656,14 @@ export default function DSAStudio() {
               </div>
               <button onClick={() => setAuthOpen(false)} aria-label="Close sign in" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
             </div>
-            <div className="space-y-4 p-6">
-              <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Name</span><input value={profileName} onChange={(event) => setProfileName(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>
-              <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Email</span><input type="email" value={profileEmail} onChange={(event) => setProfileEmail(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>
-              <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Password</span><div className="relative"><input required minLength={8} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 pr-10 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-slate-100">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></label>
-              <button disabled={password.length < 8} onClick={() => { setIsSignedIn(true); setAuthOpen(false); }} className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"><LockKeyhole className="h-4 w-4" /> Continue securely</button>
-            </div>
+            <form onSubmit={submitAuth} className="space-y-4 p-6">
+              {authMode === "signup" && <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Name</span><input required minLength={2} maxLength={80} value={profileName} onChange={(event) => setProfileName(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>}
+              <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Email</span><input required type="email" value={profileEmail} onChange={(event) => setProfileEmail(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>
+              <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Password</span><div className="relative"><input required minLength={8} maxLength={128} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 pr-10 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-slate-100">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></label>
+              {authMode === "signup" && <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Confirm password</span><input required minLength={8} maxLength={128} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></label>}
+              {authError && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{authError}</p>}
+              <button disabled={authPending} type="submit" className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-40"><LockKeyhole className="h-4 w-4" /> {authPending ? "Connecting securely..." : authMode === "signup" ? "Create account" : "Continue securely"}</button>
+            </form>
           </div>
         </div>
       )}

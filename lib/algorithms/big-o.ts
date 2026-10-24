@@ -24,16 +24,19 @@ function buildSteps(operation: BigOOperation, size: number): AlgorithmStep[] {
         ? values.map((_, index) => index)
         : operation === "linearithmic"
           ? values.map((_, index) => index).concat(values.map((_, index) => index))
-          : values.flatMap((_, outer) => values.map((_, inner) => outer === inner ? outer : -1)).filter((index) => index >= 0);
+          : values.flatMap((_, outer) => values.map((_, inner) => [outer, inner]));
 
   visits.forEach((index, stepIndex) => {
-    const safeIndex = Math.min(index, count - 1);
+    const indices = Array.isArray(index)
+      ? index
+      : [Math.min(index, count - 1)];
+    const safeIndex = indices[0] ?? 0;
     steps.push({
       step: stepIndex,
       description: `${labels[operation]}: perform work for input size ${count}. Visit ${operation === "quadratic" ? `pair ${stepIndex + 1}` : `position ${safeIndex + 1}`}.`,
       codeLine: operation === "constant" ? 2 : operation === "quadratic" ? 5 : 3,
       array: values,
-      highlightedIndices: [safeIndex],
+      highlightedIndices: indices,
     });
   });
 

@@ -1,59 +1,83 @@
 # AlgoRhythm
 
-AlgoRhythm is an interactive data-structures and algorithms learning workspace with visual execution, progress tracking, quizzes, and an AI tutor.
+**Visualize. Understand. Practice. Master.**
 
-## Getting Started
+AlgoRhythm is an interactive data-structures and algorithms workspace. It turns algorithm execution into inspectable steps with synchronized pseudocode, visual state, complexity context, quizzes, and an optional AI tutor.
 
-## Local Setup
+## Implemented features
+
+- Interactive workspaces for arrays, strings, matrices, linked lists, stacks, queues, trees, graphs, Big O, and advanced learning topics.
+- Deterministic execution steps with play, pause, next, previous, reset, keyboard shortcuts, and adjustable playback speed.
+- Synchronized code-line highlighting and operation-focused visualization panels.
+- Local progress, theme preference, quiz attempts, and best score persistence for the current browser.
+- Server-side demo authentication with signed HttpOnly sessions and scrypt password hashing.
+- Protected conversational tutor route with up to 12 recent messages, current workspace context, provider error fallback, and deterministic local guidance when `OPENAI_API_KEY` is unavailable.
+- Responsive shell with dark developer-tool styling, visible focus states, and reduced-motion support.
+
+## Local setup
 
 Install dependencies and copy the environment template:
 
-```bash
+```powershell
+cd .\dsa-platform
 npm install
-copy .env.example .env.local
+Copy-Item .env.example .env.local
 ```
 
-Create a Supabase project, then run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL editor. Add the project URL and anon key to `.env.local`. Add an OpenAI key to enable live tutor responses; without it, the local tutor fallback remains available.
+Set `AUTH_SECRET` in `.env.local` to a long random value for signed sessions. Add an OpenAI key to enable live, multi-turn tutor responses; without it, the local tutor fallback remains available but is intentionally limited and is not equivalent to a hosted generative model.
 
 Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Backend Routes
+## Architecture
 
-- `POST /api/auth/signup` creates a Supabase user and profile.
-- `POST /api/auth/signin` starts a Supabase session.
+```text
+app/                 App Router entrypoint and API routes
+components/           Workspace, visualization, code, and UI components
+data/                 Curriculum metadata and quiz content
+lib/algorithms/       Pure typed algorithm step builders
+lib/server/           Server-only authentication helpers
+stores/               Client state stores
+types/                Shared TypeScript contracts
+```
+
+The algorithm builders are kept separate from presentation. Each builder returns typed, deterministic snapshots consumed by the workspace and visualization components.
+
+## Backend routes
+
+- `POST /api/auth/signup` creates a local demo user and signed session.
+- `POST /api/auth/signin` starts a signed session for an existing demo user.
 - `POST /api/auth/signout` ends the session.
 - `GET /api/auth/me` returns the current user.
-- `POST /api/tutor` sends a protected tutor request to OpenAI or the local fallback.
+- `POST /api/tutor` sends a protected tutor request to OpenAI or the local fallback. The request can include `message`, `topic`, `step`, and up to 12 validated `messages` with `user`/`assistant` roles.
 
-Never commit `.env.local`, Supabase service-role keys, or OpenAI keys.
+## Quality checks
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The Vitest suite covers algorithm snapshots, edge cases, Big O step counts, password hashing, and tampered sessions. Browser-level verification should still cover authentication screens, playback controls, quiz completion, malformed local storage, conversational tutor history, and provider fallback behavior.
 
-## Learn More
+## Deployment and security
 
-To learn more about Next.js, take a look at the following resources:
+Set a strong random `AUTH_SECRET` in production and configure `OPENAI_API_KEY` only as a server environment variable. Never commit `.env.local`, `AUTH_SECRET`, or OpenAI keys.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The current demo auth store is process-local and browser progress uses localStorage. This is suitable for demonstration and local development, not durable multi-instance production use. Before production deployment, replace it with durable persistence and server-authorized progress APIs. Add a distributed rate limiter if the tutor endpoint is exposed through multiple instances.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Known limitations and roadmap
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Account and progress data are not durable across server restarts or shared across devices.
+- Analytics are currently derived from browser-local activity; there is no server-backed event history.
+- The local tutor is a deterministic offline fallback. ChatGPT/Claude-like open-ended responses require a valid server-side `OPENAI_API_KEY`; the application does not fabricate AI output when that provider is unavailable.
+- Tutor responses are not persisted and live-provider behavior is unverified without an API key.
+- Automated unit, integration, and end-to-end suites are not yet configured.
+- A production follow-up should add durable persistence, RLS-backed user data, broader algorithm-specific tests, and CI.
