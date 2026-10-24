@@ -387,6 +387,12 @@ export default function DSAStudio() {
   const [linkedListInput, setLinkedListInput] =
     useState("10, 20, 30, 40");
 
+  const [treeInput, setTreeInput] =
+    useState("8, 4, 12, 2, 6, 10, 14");
+
+  const [graphInput, setGraphInput] =
+    useState("1, 2, 3, 4, 5, 6 | 1-2, 1-3, 2-4, 3-4, 3-5, 4-6, 5-6");
+
   const [linkedListTarget, setLinkedListTarget] =
     useState("20");
 
@@ -582,6 +588,40 @@ export default function DSAStudio() {
     return values.length > 0 ? values : [10, 20, 30, 40];
   }, [linkedListInput]);
 
+  const parsedTree = useMemo(() => {
+    const values = treeInput
+      .split(",")
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isFinite(item));
+
+    return values.length > 0 ? values : [8, 4, 12, 2, 6, 10, 14];
+  }, [treeInput]);
+
+  const parsedGraph = useMemo(() => {
+    const [vertexText, edgeText = ""] = graphInput.split("|");
+    const values = vertexText
+      .split(",")
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isFinite(item));
+    const indexByValue = new Map(values.map((item, index) => [item, index]));
+    const edges = edgeText
+      .split(",")
+      .map((edge) => edge.trim().split("-").map((item) => Number(item.trim())))
+      .filter(
+        (edge): edge is [number, number] =>
+          edge.length === 2 &&
+          edge.every((item) => Number.isFinite(item)) &&
+          indexByValue.has(edge[0]) &&
+          indexByValue.has(edge[1])
+      )
+      .map(([from, to]) => [indexByValue.get(from)!, indexByValue.get(to)!] as [number, number]);
+
+    return {
+      values: values.length > 0 ? values : [1, 2, 3, 4, 5, 6],
+      edges: edges.length > 0 ? edges : [[0, 1], [0, 2], [1, 3], [2, 3], [2, 4], [3, 5], [4, 5]] as [number, number][],
+    };
+  }, [graphInput]);
+
   const parsedAdvancedInput = useMemo(() => {
     const values = advancedInput
       .split(",")
@@ -643,10 +683,15 @@ export default function DSAStudio() {
           {
             kind: topic,
             values: topic === "trees"
-              ? [8, 4, 12, 2, 6, 10, 14]
+              ? parsedTree
               : topic === "graphs"
-                ? [1, 2, 3, 4, 5, 6]
+                ? parsedGraph.values
                 : parsedLinkedList,
+            edges: topic === "trees"
+              ? parsedTree.slice(1).map((_, index) => [Math.floor(index / 2), index + 1] as [number, number])
+              : topic === "graphs"
+                ? parsedGraph.edges
+                : undefined,
             value: Number(structureValue),
           }
         );
@@ -701,6 +746,8 @@ export default function DSAStudio() {
       parsedMatrix,
       matrixTarget,
       parsedLinkedList,
+      parsedTree,
+      parsedGraph,
       linkedListTarget,
       structureValue,
       inputSize,
@@ -2110,11 +2157,47 @@ export default function DSAStudio() {
                 </>
               )}
 
+              {topic === "trees" && (
+                <label className="block md:col-span-2">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-600">
+                    Tree values
+                  </span>
+                  <input
+                    value={treeInput}
+                    onChange={(event) => setTreeInput(event.target.value)}
+                    placeholder="8, 4, 12, 2, 6, 10, 14"
+                    aria-describedby="tree-input-help"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <span id="tree-input-help" className="mt-1 block text-[11px] text-slate-400">
+                    Enter values in level order. Parent and child links are inferred automatically.
+                  </span>
+                </label>
+              )}
+
+              {topic === "graphs" && (
+                <label className="block md:col-span-2">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-600">
+                    Vertices and edges
+                  </span>
+                  <input
+                    value={graphInput}
+                    onChange={(event) => setGraphInput(event.target.value)}
+                    placeholder="1, 2, 3, 4 | 1-2, 1-3, 2-4"
+                    aria-describedby="graph-input-help"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <span id="graph-input-help" className="mt-1 block text-[11px] text-slate-400">
+                    Use a pipe between vertices and edges, then connect values with hyphens.
+                  </span>
+                </label>
+              )}
+
               {(topic === "trees" || topic === "graphs") && (
                 <p className="text-xs leading-5 text-slate-500 md:col-span-2">
                   {topic === "trees"
-                    ? "The example binary tree uses the root, parent, child, and leaf relationships shown during traversal."
-                    : "The example graph uses six vertices and a shared edge set to compare breadth-first and depth-first search."}
+                    ? "Tree structure is inferred from the level-order values you enter."
+                    : "BFS and DFS use the vertices and undirected edges you enter."}
                 </p>
               )}
 

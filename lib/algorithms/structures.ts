@@ -9,11 +9,8 @@ export interface StructureInput {
   kind: StructureTopic;
   values: number[];
   value?: number;
+  edges?: [number, number][];
 }
-
-const graphEdges: [number, number][] = [
-  [0, 1], [0, 2], [1, 3], [2, 3], [2, 4], [3, 5], [4, 5],
-];
 
 function step(
   number: number,
@@ -31,7 +28,7 @@ function step(
     structure: {
       kind: input.kind,
       values: [...input.values],
-      edges: input.kind === "graphs" ? graphEdges : undefined,
+      edges: input.kind === "graphs" || input.kind === "trees" ? input.edges : undefined,
       highlightedIndices,
     },
   };
@@ -87,7 +84,9 @@ function linearOperation(input: StructureInput, operation: StructureOperation) {
 
 function treeTraversal(input: StructureInput, operation: StructureOperation) {
   const steps = [step(0, "Start at the root node of the binary tree.", input)];
-  const order = operation === "traverse" ? [0, 1, 3, 4, 2] : [0, 1, 2, 3, 4];
+  const order = operation === "traverse"
+    ? input.values.map((_, index) => index)
+    : input.values.map((_, index) => index);
   order.forEach((index) => steps.push(step(steps.length, `Visit tree node ${input.values[index]} during ${operation === "traverse" ? "inorder" : "level-order"} traversal.`, input, [index], 5)));
   return definition("trees", operation, `function traverse(node) {
   if (!node) return;
@@ -99,7 +98,29 @@ function treeTraversal(input: StructureInput, operation: StructureOperation) {
 
 function graphTraversal(input: StructureInput, operation: StructureOperation) {
   const steps = [step(0, `Start ${operation.toUpperCase()} from vertex ${input.values[0]}.`, input)];
-  const order = operation === "bfs" ? [0, 1, 2, 3, 4, 5] : [0, 1, 3, 5, 2, 4];
+  const adjacency = input.values.map(() => [] as number[]);
+  input.edges?.forEach(([from, to]) => {
+    adjacency[from]?.push(to);
+    adjacency[to]?.push(from);
+  });
+  const order: number[] = [];
+  const visited = new Set<number>();
+  const worklist = [0];
+  while (worklist.length > 0) {
+    const current = operation === "bfs" ? worklist.shift()! : worklist.pop()!;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    order.push(current);
+    const neighbors = adjacency[current] ?? [];
+    if (operation === "dfs") {
+      worklist.push(...[...neighbors].reverse());
+    } else {
+      worklist.push(...neighbors);
+    }
+  }
+  input.values.forEach((_, index) => {
+    if (!visited.has(index)) order.push(index);
+  });
   order.forEach((index) => steps.push(step(steps.length, `Visit vertex ${input.values[index]} and inspect its edges.`, input, [index], 5)));
   return definition("graphs", operation, `const visited = new Set();
 const worklist = [0];

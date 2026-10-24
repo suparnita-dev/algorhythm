@@ -6,6 +6,7 @@ import { buildBigOAlgorithm } from "@/lib/algorithms/big-o";
 import { buildLinkedListAlgorithm } from "@/lib/algorithms/linked-lists";
 import { buildMatrixAlgorithm } from "@/lib/algorithms/matrices";
 import { buildStringAlgorithm } from "@/lib/algorithms/strings";
+import { buildStructureAlgorithm } from "@/lib/algorithms/structures";
 import {
   createUser,
   hashPassword,
@@ -82,6 +83,22 @@ describe("algorithm step builders", () => {
     expect(recursion.steps.some((step) => step.description.includes("factorial(3)"))).toBe(true);
     expect(search.steps.some((step) => step.description.includes("target 5"))).toBe(true);
     expect(bits.steps.at(-1)?.array[0]).toBe(20);
+  });
+
+  it("traverses learner-provided graph edges", () => {
+    const algorithm = buildStructureAlgorithm("bfs", {
+      kind: "graphs",
+      values: [10, 20, 30, 40],
+      edges: [[0, 2], [2, 1], [1, 3]],
+    });
+
+    expectValidSteps(algorithm.steps);
+    expect(algorithm.steps.slice(1).map((step) => step.array[step.highlightedIndices[0]])).toEqual([
+      10,
+      30,
+      20,
+      40,
+    ]);
   });
 });
 
